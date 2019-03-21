@@ -28,39 +28,117 @@ When used with numeric functions, TRUE is converted to 1 and FALSE to 0.
 flights
 ```
 
+```{r}
+str(flights)
+head(flights)
+flight_delay_summary <- group_by(flights, flight) %>% summarise(num_flights = n(),
+            
+                                          percentage_on_time = sum(arr_time == sched_arr_time)/num_flights,
+                                          percentage_early = sum(arr_time < sched_arr_time)/num_flights, 
+                                          percentage_10_mins_late = sum(arr_time - sched_arr_time == 10)/num_flights,
+                                          percentage_15_mins_early = sum(sched_arr_time - arr_time == 15)/num_flights,
+                                          percentage_15_mins_late = sum(arr_time - sched_arr_time == 15)/num_flights,
+                                          percentage_30_mins_early = sum(sched_arr_time - arr_time == 30)/num_flights,
+                                          percentage_30_mins_late = sum(arr_time - sched_arr_time == 30)/num_flights,
+                                          percentage_2_hours_late = sum(arr_time - sched_arr_time == 120)/num_flights)
+flight_delay_summary
+```
+
 
 Consider the following scenarios:
 
   - A flight is 15 minutes early 50% of the time, and 15 minutes late 50% of the time.
 
 ```{r}
-
+flight_delay_summary %>% 
+  filter(percentage_15_mins_early == 0.5 & percentage_15_mins_late == 0.5)
 ```
 
 
   - A flight is always 10 minutes late.
 
 ```{r}
-
+flight_delay_summary  %>%
+  filter(percentage_10_mins_late == 1)
 ```
 
   - A flight is 30 minutes early 50% of the time, and 30 minutes late 50% of the time.
 
   - 99% of the time a flight is on time. 1% of the time it’s 2 hours late.
 
-```{r}
 
+```{r}
+flight_delay_summary %>%
+  filter(percentage_30_mins_early== 0.5 & percentage_30_mins_late == 0.5)
+```
+
+```{r}
+flight_delay_summary %>%
+  filter(percentage_on_time == 0.99 & percentage_2_hours_late == 0.01)
 ```
 
 
   - Which is more important: arrival delay or departure delay?
+  
+  Both are imortant.
 
 2. Come up with another approach that will give you the same output as not_cancelled %>% count(dest) and not_cancelled %>% count(tailnum, wt = distance) (without using count()).
 
+```{r}
+not_cancelled <-
+  flights %>% 
+  filter(!is.na(dep_delay), !is.na(arr_delay))
+not_cancelled %>%
+  count(dest)
+```
+
+
 3. Our definition of cancelled flights (is.na(dep_delay) | is.na(arr_delay) ) is slightly suboptimal. Why? Which is the most important column?
+
+There are no flights that arrived but did not depart.
+
+```{r}
+flights %>%
+    group_by(departed = !is.na(dep_delay), arrived = !is.na(arr_delay)) %>%
+    summarise(n=n())
+```
 
 4. Look at the number of cancelled flights per day. Is there a pattern? Is the proportion of cancelled flights related to the average delay?
 
+```{r}
+flights %>%
+  group_by(day) %>%
+  summarise(cancelled = mean(is.na(dep_delay)),
+            mean_dep = mean(dep_delay, na.rm = T),
+            mean_arr = mean(arr_delay, na.rm = T)) %>%
+  ggplot(aes(y = cancelled)) +
+  geom_point(aes(x = mean_dep), colour = "blue") +
+  geom_point(aes(x = mean_arr), colour = "green") +
+  labs(x = "Avg delay per day", y = "Cancelled flights p day")
+```
+
+
+There is no a strong relatioship between delay and cancelations. The higher the average delay of the day, the higher the proportion of cancelled flights per day.
+
+
+
 5. Which carrier has the worst delays? Challenge: can you disentangle the effects of bad airports vs. bad carriers? Why/why not? (Hint: think about flights %>% group_by(carrier, dest) %>% summarise(n()))
 
+```{r}
+flights %>%
+  group_by(carrier) %>%
+  summarise(dep_max = max(dep_delay, na.rm = T),
+            arr_max = max(arr_delay, na.rm = T)) %>%
+  arrange(desc(dep_max, arr_max)) %>%
+  filter(1:n() == 1)
+```
+
 6. What does the sort argument to count() do. When might you use it?
+
+Sort helps us to sort cases based on the count.
+
+
+```{r}
+flights %>%
+  count(flight, sort = T)
+```
